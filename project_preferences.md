@@ -45,9 +45,23 @@ This "delete to reconfigure" approach is simple and bulletproof - ensures users 
 
 ## Configuration Structure
 
+### File Organization
+
+```
+settings.toml          # Application defaults (version controlled)
+user.toml              # User-specific config (gitignored, auto-created on first run)
+.secrets.toml          # API keys, tokens (gitignored)
+settings/              # Model configuration directory
+  ├── gfs.toml         # GFS model configuration
+  ├── nam.toml         # NAM model (when added)
+  └── hrrr.toml        # HRRR model (when added)
+```
+
+**Auto-discovery:** Dynaconf uses glob pattern `settings/*.toml` to automatically load all model configs. Just add a file to `settings/` directory and it's immediately available!
+
 ### Model Configuration Pattern
 
-Each forecast model has its own TOML configuration file (e.g., `gfs.toml`). This pattern will be followed for all future models.
+Each forecast model has its own TOML configuration file in `settings/` directory (e.g., `settings/gfs.toml`). This pattern will be followed for all future models.
 
 #### Configuration Sections
 
@@ -248,10 +262,16 @@ The CLI includes intelligent file management to avoid unnecessary downloads:
 - Supports future processing pipelines (process all hours in a folder)
 
 ### Adding New Models
-1. Create new config file: `{model_name}.toml`
+
+**Simple:** Just add a new TOML file to `settings/` directory!
+
+1. Create new config file: `settings/{model_name}.toml`
 2. Define `[{model}_data]`, `[{model}_queries]`, `[{model}_products]` sections
-3. Add model to CLI selection menu
-4. No code changes required - configuration driven
+3. File is automatically discovered by dynaconf glob pattern
+4. Add model to CLI selection menu
+5. No code changes required - fully configuration driven
+
+Example: To add NAM model, create `settings/nam.toml` with the same structure as `settings/gfs.toml`
 
 ### Adding New Products
 1. Add product definition to `[{model}_products.{product_name}]`

@@ -135,7 +135,7 @@ def ensure_storage_configured() -> Path:
         from dynaconf import Dynaconf
         settings = Dynaconf(
             envvar_prefix="DYNACONF",
-            settings_files=["settings.toml", "user.toml", ".secrets.toml", "gfs.toml"],
+            settings_files=["settings.toml", "user.toml", ".secrets.toml", "settings/*.toml"],
             merge_enabled=True,
         )
 
