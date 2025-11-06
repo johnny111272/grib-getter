@@ -1,0 +1,24 @@
+[project]
+name = "weather-model"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "cartopy>=0.25.0",
+    "cfgrib>=0.9.15.1",
+    "dynaconf>=3.2.12",
+    "ipykernel>=7.1.0",
+    "jupyter>=1.1.1",
+    "loguru>=0.7.3",
+    "matplotlib>=3.10.7",
+    "msgspec>=0.19.0",
+    "polars>=1.35.1",
+    "pydantic>=2.12.4",
+    "rich[jupyter]>=14.2.0",
+    "ruff>=0.14.3",
+    "tenacity>=9.1.2",
+    "tomli-w>=1.2.0",
+    "ty>=0.0.1a25",
+    "xarray>=2025.10.1",
+]
