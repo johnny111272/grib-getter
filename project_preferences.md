@@ -208,6 +208,45 @@ The CLI includes intelligent file management to avoid unnecessary downloads:
 
 ## Future Expansions
 
+### Async Batch Downloading (Planned)
+
+**Status**: File structure ready, implementation pending
+
+**Purpose**: Download multiple forecast hours from a confirmed run in parallel for efficiency
+
+**Workflow**:
+1. Download and verify .anl file (forecast hour 000) to confirm run availability
+2. Once run is confirmed, launch async batch download for selected forecast hours
+3. All files saved in same run-specific folder with sequential naming
+
+**File Organization** (Already Implemented):
+- Folder: `YYYYMMDD_HH_{model_name}_{preset_name}/`
+- Analysis file: `YYYYMMDD_HH_000_{model_name}_{preset_name}.grib`
+- Forecast files: `YYYYMMDD_HH_FFF_{model_name}_{preset_name}.grib`
+  - Example: `20251106_12_001_GFS_sailing_basic.grib` (1-hour forecast)
+  - Example: `20251106_12_006_GFS_sailing_basic.grib` (6-hour forecast)
+  - Example: `20251106_12_012_GFS_sailing_basic.grib` (12-hour forecast)
+
+**Hour Selection Configuration** (To Be Designed):
+- Similar pattern to variables/levels selection
+- Pre-defined "recipes" for common use cases (e.g., "24hr", "48hr", "week")
+- Bitmask encoding for efficient selection
+- Stored in model config file (e.g., `[gfs_hour_recipes]` in `gfs.toml`)
+
+**Pending Design Decisions**:
+- Which forecast hours are available for each model/product
+- How to configure hour selection (leaning towards bitmask recipes like variables/levels)
+- Error handling for partial batch failures
+- Progress reporting for multi-file downloads
+- Bandwidth management for batch operations
+
+**Benefits**:
+- Efficient parallel downloads via async/httpx
+- Atomic operations: confirm run exists before batch download
+- Easy to identify complete vs partial downloads (check folder contents)
+- Natural file sorting by forecast hour
+- Supports future processing pipelines (process all hours in a folder)
+
 ### Adding New Models
 1. Create new config file: `{model_name}.toml`
 2. Define `[{model}_data]`, `[{model}_queries]`, `[{model}_products]` sections

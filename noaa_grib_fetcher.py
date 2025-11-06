@@ -12,16 +12,15 @@ This implementation respects that limit.
 import datetime as dt
 import time
 from collections.abc import Iterator
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
 from loguru import logger
-from msgspec import Struct
+from pydantic import BaseModel
 
 import noaa_query_builder as nqb
 from config import settings
-
 
 # =============================================================================
 # EXCEPTIONS
@@ -45,7 +44,7 @@ class NOAAServerError(Exception):
 # =============================================================================
 
 
-class FetchAttempt(Struct):
+class FetchAttempt(BaseModel):
     """Record of a single fetch attempt."""
 
     url: str
@@ -54,7 +53,7 @@ class FetchAttempt(Struct):
     timestamp: datetime
 
 
-class FetchResult(Struct):
+class FetchResult(BaseModel):
     """Result of fetch operation with metadata."""
 
     data: bytes | None
@@ -77,6 +76,7 @@ def calculate_exponential_backoff(
     Calculate exponential backoff delay with jitter.
 
     Prevents thundering herd by adding randomness to retry timing.
+    Jitter helps avoid synchronized retries from multiple clients.
     """
     import random
 
@@ -85,9 +85,12 @@ def calculate_exponential_backoff(
     if max_delay is None:
         max_delay = settings.retry_settings.max_delay_seconds
 
+    # Exponential backoff: 2^attempt * initial_delay, capped at max_delay
     delay = min(initial_delay * (2**attempt), max_delay)
-    # Add jitter: ±20% of calculated delay
-    jitter = delay * 0.2 * (2 * random.random() - 1)
+
+    # Add jitter: ±20% of calculated delay to prevent thundering herd
+    jitter_percent = 0.2
+    jitter = delay * jitter_percent * (2 * random.random() - 1)
     return delay + jitter
 
 
@@ -249,7 +252,10 @@ def fetch_most_recent_forecast(
         response, attempts = fetch_with_exponential_backoff(url)
         all_attempts.extend(attempts)
 
-        if response is not None and response.status_code == settings.http_settings.success:
+        if (
+            response is not None
+            and response.status_code == settings.http_settings.success
+        ):
             # Success! Save and return
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(response.content)

@@ -1,30 +1,39 @@
 [core_settings]
 grib_url = "https://nomads.ncep.noaa.gov/cgi-bin/{filter}"
-# output_dir = "./grib_data"  # Configured on first run or via CLI --configure
 forecast_interval_hours = 6
 max_lookback_hours = 18
+output_dir = "/Users/johnny/dev/python/grib-getter/grib_data"
 
 [http_settings]
-# HTTP status codes
 success = 200
 not_found = 404
 server_error = 500
 request_timeout_seconds = 30
 
 [noaa_settings]
-# NOAA rate limiting (seconds between requests for same file)
 rate_limit_seconds = 10
 
 [retry_settings]
-# Retry configuration
 max_attempts = 3
 initial_delay_seconds = 5
-max_delay_seconds = 300  # 5 minutes
+max_delay_seconds = 300
 timeout_minutes = 30
 
 [default_location]
-# Location defaults (Minneapolis area)
 center_lat = 45.0
 center_lon = -93.0
 height_degrees = 90.0
 width_degrees = 180.0
+
+[defaults]
+grib_dir = "grib_data"
+model_name = "GFS"
+product_name = "gfs_quarter_degree"
+
+[backup]
+max_count = 100
+extension = ".bak"
+
+[query]
+var_prefix = "var_"
+lev_prefix = "lev_"

@@ -7,12 +7,14 @@ command-line interface.
 """
 
 import datetime as dt
-import tomli_w
+import sys
 from pathlib import Path
 
+import tomli_w
 import typer
 from loguru import logger
 from rich.console import Console
+from rich.logging import RichHandler
 from rich.prompt import Prompt, Confirm
 from typing_extensions import Annotated
 
@@ -25,6 +27,32 @@ app = typer.Typer(
     add_completion=False,
 )
 console = Console()
+
+
+# =============================================================================
+# LOGGING SETUP
+# =============================================================================
+
+
+def setup_logging() -> None:
+    """
+    Configure loguru with rich handler for enhanced console output.
+
+    Should be called once at application entry point.
+    """
+    # Remove default handler
+    logger.remove()
+
+    # Add rich handler for beautiful console output
+    logger.add(
+        RichHandler(
+            console=console,
+            rich_tracebacks=True,
+            tracebacks_show_locals=True,
+        ),
+        format="{message}",
+        level="INFO",
+    )
 
 
 # Configuration file path
@@ -69,13 +97,14 @@ def ensure_storage_configured() -> Path:
     Ensure storage path is configured. Prompts user if not set.
     Returns the configured storage path.
     """
+    global settings
     storage_path = get_storage_path()
 
     if storage_path is None:
         console.print("\n[bold yellow]First-time setup required[/bold yellow]")
         console.print("Please configure where GRIB files should be stored.\n")
 
-        default_path = Path.cwd() / "grib_data"
+        default_path = Path.cwd() / settings.defaults.grib_dir
         path_input = Prompt.ask(
             "Storage directory for GRIB files",
             default=str(default_path),
@@ -96,7 +125,6 @@ def ensure_storage_configured() -> Path:
 
         # Reload settings
         from dynaconf import Dynaconf
-        global settings
         settings = Dynaconf(
             envvar_prefix="DYNACONF",
             settings_files=["settings.toml", ".secrets.toml", "gfs.toml"],
@@ -173,25 +201,43 @@ def prompt_for_location() -> nqb.LocationSettings:
 
 
 def generate_output_filename(
+    model_name: str,
     product_name: str,
+    preset_name: str,
     forecast_time: dt.datetime,
+    forecast_hour: int,
     storage_path: Path,
 ) -> Path:
     """
-    Generate output filename following convention: YYYYMMDD_HH_product_name.grib
+    Generate output filename in run-specific folder structure.
+
+    New structure for async batch downloading support:
+    - Folder: YYYYMMDD_HH_{model_name}_{preset_name}/
+    - File: YYYYMMDD_HH_FFF_{model_name}_{preset_name}.grib
+      where FFF is the forecast hour (000 for analysis, 001, 006, 012, etc.)
 
     Args:
+        model_name: Model identifier (e.g., 'GFS')
         product_name: Product identifier (e.g., 'gfs_quarter_degree')
+        preset_name: Query preset name (e.g., 'sailing_basic')
         forecast_time: Forecast run datetime
-        storage_path: Directory where GRIB files are stored
+        forecast_hour: Forecast hour (0 for analysis file)
+        storage_path: Base directory where GRIB files are stored
 
     Returns:
-        Path to output file in storage directory
+        Path to output file in run-specific subdirectory
     """
     date_part = forecast_time.strftime("%Y%m%d")
     hour_part = forecast_time.strftime("%H")
-    filename = f"{date_part}_{hour_part}_{product_name}.grib"
-    return storage_path / filename
+
+    # Create run-specific folder name
+    folder_name = f"{date_part}_{hour_part}_{model_name}_{preset_name}"
+    run_folder = storage_path / folder_name
+
+    # Create filename with forecast hour
+    filename = f"{date_part}_{hour_part}_{forecast_hour:03d}_{model_name}_{preset_name}.grib"
+
+    return run_folder / filename
 
 
 def create_backup_file(original_path: Path) -> Path:
@@ -212,14 +258,15 @@ def create_backup_file(original_path: Path) -> Path:
     """
     # Find next available backup number
     backup_num = 0
-    while backup_num < 100:
-        backup_path = Path(f"{original_path}.{backup_num:02d}.bak")
+    while backup_num < settings.backup.max_count:
+        backup_path = Path(f"{original_path}.{backup_num:02d}{settings.backup.extension}")
         if not backup_path.exists():
             break
         backup_num += 1
     else:
-        # If we've hit 100 backups, overwrite .99.bak
-        backup_path = Path(f"{original_path}.99.bak")
+        # If we've hit max backups, overwrite the last one
+        final_backup_num = settings.backup.max_count - 1
+        backup_path = Path(f"{original_path}.{final_backup_num:02d}{settings.backup.extension}")
 
     # Create backup by renaming original
     original_path.rename(backup_path)
@@ -307,6 +354,8 @@ def fetch(
         # Check what's available without downloading
         python fetch_forecast.py fetch -p sailing_basic --check-only
     """
+    setup_logging()
+
     console.print("[bold blue]grib-getter: NOAA Weather Forecast Fetcher[/bold blue]\n")
 
     # Ensure storage path is configured (first-run setup if needed)
@@ -341,8 +390,8 @@ def fetch(
 
     # Build query structure
     console.print(f"\n[bold]Configuration:[/bold]")
-    console.print(f"  Model: [green]GFS[/green] (auto-selected)")
-    console.print(f"  Product: [green]gfs_quarter_degree[/green] (auto-selected)")
+    console.print(f"  Model: [green]{settings.defaults.model_name}[/green] (auto-selected)")
+    console.print(f"  Product: [green]{settings.defaults.product_name}[/green] (auto-selected)")
     console.print(f"  Preset: [green]{preset}[/green]")
     console.print(
         f"  Location: [green]{location.center_lat}, {location.center_lon}[/green] "
@@ -362,12 +411,12 @@ def fetch(
         variables=nqb.SelectedKeys(
             all_keys=model_data.variables,
             hex_mask=query_mask.variables,
-            prefix="var_",
+            prefix=settings.query.var_prefix,
         ),
         levels=nqb.SelectedKeys(
             all_keys=model_data.levels,
             hex_mask=query_mask.levels,
-            prefix="lev_",
+            prefix=settings.query.lev_prefix,
         ),
         current_time=dt.datetime.now(tz=dt.timezone.utc),
         settings=nqb.CoreSettings.model_validate(settings.core_settings),
@@ -383,7 +432,14 @@ def fetch(
     latest_forecast = nqb.get_latest_run_start(
         dt.datetime.now(tz=dt.timezone.utc), qs
     )
-    output_path = generate_output_filename("gfs_quarter_degree", latest_forecast, storage_path)
+    output_path = generate_output_filename(
+        model_name=settings.defaults.model_name,
+        product_name=settings.defaults.product_name,
+        preset_name=preset,
+        forecast_time=latest_forecast,
+        forecast_hour=0,  # 0 for analysis (.anl) file
+        storage_path=storage_path,
+    )
 
     console.print(f"\n[bold]Target file:[/bold]")
     console.print(f"  Path: [cyan]{output_path}[/cyan]")
@@ -488,6 +544,8 @@ def configure(
         # Set storage path directly
         grib-getter configure --storage /path/to/grib_data
     """
+    setup_logging()
+
     console.print("[bold blue]grib-getter Configuration[/bold blue]\n")
 
     if storage_path is None:
@@ -496,7 +554,7 @@ def configure(
         if current_path:
             console.print(f"Current storage path: [cyan]{current_path}[/cyan]\n")
 
-        default_path = current_path or Path.cwd() / "grib_data"
+        default_path = current_path or Path.cwd() / settings.defaults.grib_dir
         path_input = Prompt.ask(
             "Storage directory for GRIB files",
             default=str(default_path),

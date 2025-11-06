@@ -19,7 +19,6 @@ dependencies = [
     "dynaconf>=3.2.12",
     "httpx>=0.28.1",
     "loguru>=0.7.3",
-    "msgspec>=0.19.0",
     "pydantic>=2.12.4",
     "rich>=14.2.0",
     "tomli>=2.3.0",
