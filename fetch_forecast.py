@@ -144,6 +144,28 @@ def fetch(
             help="Force interactive mode even if all options provided",
         ),
     ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Force download even if file already exists locally",
+        ),
+    ] = False,
+    new_only: Annotated[
+        bool,
+        typer.Option(
+            "--new-only",
+            help="Only download if file doesn't exist locally",
+        ),
+    ] = False,
+    check_only: Annotated[
+        bool,
+        typer.Option(
+            "--check-only",
+            help="Check what forecast is available on server without downloading",
+        ),
+    ] = False,
 ) -> None:
     """
     Fetch NOAA GFS weather forecast data.
@@ -158,8 +180,14 @@ def fetch(
         # Non-interactive with all options
         python fetch_forecast.py fetch -p sailing_basic --lat 45 --lon -93 --height 90 --width 180
 
-        # Partial options (will prompt for missing ones)
-        python fetch_forecast.py fetch -p sailing_basic
+        # Force download even if file exists
+        python fetch_forecast.py fetch -p sailing_basic --force
+
+        # Only download if file doesn't exist (bandwidth-saving)
+        python fetch_forecast.py fetch -p sailing_basic --new-only
+
+        # Check what's available without downloading
+        python fetch_forecast.py fetch -p sailing_basic --check-only
     """
     console.print("[bold blue]NOAA Weather Forecast Fetcher[/bold blue]\n")
 
@@ -236,8 +264,50 @@ def fetch(
     )
     output_path = generate_output_filename("gfs_quarter_degree", latest_forecast)
 
+    console.print(f"\n[bold]Target file:[/bold]")
+    console.print(f"  Path: [cyan]{output_path}[/cyan]")
+    console.print(f"  Forecast time: [cyan]{latest_forecast.strftime('%Y-%m-%d %H:00 UTC')}[/cyan]")
+
+    # Check if file already exists
+    file_exists = output_path.exists()
+    if file_exists:
+        file_size = output_path.stat().st_size
+        console.print(f"  Status: [yellow]File already exists ({file_size:,} bytes)[/yellow]")
+    else:
+        console.print(f"  Status: [dim]File does not exist locally[/dim]")
+
+    # Handle check-only mode
+    if check_only:
+        console.print(f"\n[bold]Check-only mode:[/bold] No download will be performed")
+        if file_exists:
+            console.print(f"[green]✓[/green] Latest forecast file exists locally")
+        else:
+            console.print(f"[yellow]![/yellow] Latest forecast file not found locally")
+        raise typer.Exit(code=0)
+
+    # Handle existing file
+    if file_exists and not force:
+        if new_only:
+            console.print(f"\n[yellow]File exists and --new-only specified. Skipping download.[/yellow]")
+            console.print(f"  Using existing file: [cyan]{output_path}[/cyan]")
+            raise typer.Exit(code=0)
+        else:
+            # Interactive prompt for what to do
+            console.print(f"\n[bold yellow]File already exists![/bold yellow]")
+            choice = Prompt.ask(
+                "What would you like to do?",
+                choices=["download", "skip", "cancel"],
+                default="skip",
+            )
+            if choice == "skip":
+                console.print(f"[green]Using existing file: {output_path}[/green]")
+                raise typer.Exit(code=0)
+            elif choice == "cancel":
+                console.print("[red]Cancelled[/red]")
+                raise typer.Exit(code=1)
+            # choice == "download" falls through to fetch below
+
     console.print(f"\n[bold]Fetching data...[/bold]")
-    console.print(f"  Output: [cyan]{output_path}[/cyan]")
 
     # Fetch data
     result = ngf.fetch_with_timeout(

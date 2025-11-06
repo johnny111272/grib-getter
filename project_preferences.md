@@ -110,6 +110,45 @@ Since only GFS model and `gfs_quarter_degree` product exist:
 - Prompt for query preset (show available options from `[gfs_queries]`)
 - Prompt for location with smart defaults
 
+### Bandwidth Optimization Features
+
+**Critical for bandwidth-limited environments (sailboat liveaboard)**
+
+The CLI includes intelligent file management to avoid unnecessary downloads:
+
+**File Existence Checking**:
+- Before downloading, checks if target forecast file already exists locally
+- Shows file size and forecast time for existing files
+- Prompts user for action if file exists (download, skip, cancel)
+
+**Download Control Flags**:
+
+1. **`--force` / `-f`**: Force download even if file exists
+   - Use when you want to ensure latest data regardless of local cache
+   - Example: `fetch -p sailing_basic --force`
+
+2. **`--new-only`**: Only download if file doesn't exist locally
+   - Bandwidth-saving mode: never re-download existing forecasts
+   - Perfect for automated scripts that should download once
+   - Example: `fetch -p sailing_basic --new-only`
+
+3. **`--check-only`**: Check forecast availability without downloading
+   - Shows what forecast time would be downloaded
+   - Checks if file exists locally
+   - No network bandwidth used for download
+   - Example: `fetch -p sailing_basic --check-only`
+
+**Interactive Behavior**:
+- If file exists and no flags specified: prompts user
+- Default choice is "skip" to avoid accidental re-downloads
+- Clear status messages show file size and existence
+
+**Use Cases**:
+- Daily automated fetch: `--new-only` (only gets new forecasts)
+- Pre-departure check: `--check-only` (verify without downloading)
+- Force refresh: `--force` (get latest even if cached)
+- Bandwidth monitoring: Check file size before deciding to download
+
 ## Future Expansions
 
 ### Adding New Models
