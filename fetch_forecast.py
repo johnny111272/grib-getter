@@ -1,0 +1,271 @@
+#!/usr/bin/env python3
+"""
+NOAA Weather Forecast Fetcher CLI
+
+Fetch weather forecast data from NOAA's NOMADS server with an interactive
+command-line interface.
+"""
+
+import datetime as dt
+from pathlib import Path
+
+import typer
+from loguru import logger
+from rich.console import Console
+from rich.prompt import Prompt
+from typing_extensions import Annotated
+
+import noaa_grib_fetcher as ngf
+import noaa_query_builder as nqb
+from config import settings
+
+app = typer.Typer(
+    help="Fetch NOAA weather forecast data",
+    add_completion=False,
+)
+console = Console()
+
+
+def get_available_query_presets() -> list[str]:
+    """Get list of available query preset names from GFS settings."""
+    return list(settings.GFS_QUERIES.keys())
+
+
+def prompt_for_query_preset() -> str:
+    """Interactively prompt user to select a query preset."""
+    presets = get_available_query_presets()
+
+    if len(presets) == 1:
+        console.print(f"[dim]Auto-selecting query preset: {presets[0]}[/dim]")
+        return presets[0]
+
+    console.print("\n[bold]Available Query Presets:[/bold]")
+    for i, preset in enumerate(presets, 1):
+        console.print(f"  {i}. {preset}")
+
+    while True:
+        choice = Prompt.ask(
+            "\nSelect preset",
+            choices=[str(i) for i in range(1, len(presets) + 1)],
+            default="1",
+        )
+        return presets[int(choice) - 1]
+
+
+def prompt_for_location() -> nqb.LocationSettings:
+    """Interactively prompt user for location parameters."""
+    console.print("\n[bold]Location Configuration[/bold]")
+    console.print("[dim]Using center point + expanse format[/dim]")
+
+    # Get defaults from settings
+    defaults = settings.DEFAULT_LOCATION
+
+    center_lat = float(
+        Prompt.ask(
+            "Center latitude (-90 to 90)",
+            default=str(defaults.center_lat),
+        )
+    )
+    center_lon = float(
+        Prompt.ask(
+            "Center longitude (-180 to 180)",
+            default=str(defaults.center_lon),
+        )
+    )
+    height_degrees = float(
+        Prompt.ask(
+            "Height in degrees",
+            default=str(defaults.height_degrees),
+        )
+    )
+    width_degrees = float(
+        Prompt.ask(
+            "Width in degrees",
+            default=str(defaults.width_degrees),
+        )
+    )
+
+    return nqb.LocationSettings(
+        center_lat=center_lat,
+        center_lon=center_lon,
+        height_degrees=height_degrees,
+        width_degrees=width_degrees,
+    )
+
+
+def generate_output_filename(product_name: str, forecast_time: dt.datetime) -> Path:
+    """
+    Generate output filename following convention: YYYYMMDDHH_product_name.grib
+
+    Args:
+        product_name: Product identifier (e.g., 'gfs_quarter_degree')
+        forecast_time: Forecast run datetime
+
+    Returns:
+        Path to output file in _mutable directory
+    """
+    timestamp = forecast_time.strftime("%Y%m%d%H")
+    filename = f"{timestamp}_{product_name}.grib"
+    return Path(settings.core_settings.output_dir) / filename
+
+
+@app.command()
+def fetch(
+    preset: Annotated[
+        str | None,
+        typer.Option(
+            "--preset",
+            "-p",
+            help="Query preset name (e.g., 'sailing_basic'). If not provided, will prompt interactively.",
+        ),
+    ] = None,
+    lat: Annotated[
+        float | None,
+        typer.Option("--lat", help="Center latitude (-90 to 90)"),
+    ] = None,
+    lon: Annotated[
+        float | None,
+        typer.Option("--lon", help="Center longitude (-180 to 180)"),
+    ] = None,
+    height: Annotated[
+        float | None,
+        typer.Option("--height", help="Height in degrees"),
+    ] = None,
+    width: Annotated[
+        float | None,
+        typer.Option("--width", help="Width in degrees"),
+    ] = None,
+    interactive: Annotated[
+        bool,
+        typer.Option(
+            "--interactive/--no-interactive",
+            "-i/-I",
+            help="Force interactive mode even if all options provided",
+        ),
+    ] = False,
+) -> None:
+    """
+    Fetch NOAA GFS weather forecast data.
+
+    Can be used interactively (prompts for all options) or with command-line arguments
+    for automation.
+
+    Examples:
+        # Interactive mode (default)
+        python fetch_forecast.py fetch
+
+        # Non-interactive with all options
+        python fetch_forecast.py fetch -p sailing_basic --lat 45 --lon -93 --height 90 --width 180
+
+        # Partial options (will prompt for missing ones)
+        python fetch_forecast.py fetch -p sailing_basic
+    """
+    console.print("[bold blue]NOAA Weather Forecast Fetcher[/bold blue]\n")
+
+    # Determine if we need interactive prompts
+    need_preset = preset is None
+    need_location = any(x is None for x in [lat, lon, height, width])
+
+    if interactive or need_preset or need_location:
+        # Interactive mode
+        if need_preset:
+            preset = prompt_for_query_preset()
+
+        if need_location:
+            location = prompt_for_location()
+        else:
+            location = nqb.LocationSettings(
+                center_lat=lat,  # type: ignore
+                center_lon=lon,  # type: ignore
+                height_degrees=height,  # type: ignore
+                width_degrees=width,  # type: ignore
+            )
+    else:
+        # Fully non-interactive
+        location = nqb.LocationSettings(
+            center_lat=lat,  # type: ignore
+            center_lon=lon,  # type: ignore
+            height_degrees=height,  # type: ignore
+            width_degrees=width,  # type: ignore
+        )
+
+    # Build query structure
+    console.print(f"\n[bold]Configuration:[/bold]")
+    console.print(f"  Model: [green]GFS[/green] (auto-selected)")
+    console.print(f"  Product: [green]gfs_quarter_degree[/green] (auto-selected)")
+    console.print(f"  Preset: [green]{preset}[/green]")
+    console.print(
+        f"  Location: [green]{location.center_lat}, {location.center_lon}[/green] "
+        f"({location.width_degrees}° × {location.height_degrees}°)"
+    )
+
+    # Load model data and query mask
+    model_data = nqb.ModelData.model_validate(settings.GFS_DATA)
+    query_mask = nqb.QueryMask.model_validate(getattr(settings.GFS_QUERIES, preset))
+
+    # Build query structure
+    qs = nqb.QueryStructure(
+        bounding_box=nqb.create_bounding_box(ls=location),
+        query_model=nqb.QueryModel.model_validate(
+            settings.GFS_SETTINGS.products.gfs_quarter_degree,
+        ),
+        variables=nqb.SelectedKeys(
+            all_keys=model_data.variables,
+            hex_mask=query_mask.variables,
+            prefix="var_",
+        ),
+        levels=nqb.SelectedKeys(
+            all_keys=model_data.levels,
+            hex_mask=query_mask.levels,
+            prefix="lev_",
+        ),
+        current_time=dt.datetime.now(tz=dt.timezone.utc),
+        settings=nqb.CoreSettings.model_validate(settings.core_settings),
+    )
+
+    # Generate query URLs
+    query_urls = nqb.generate_query_urls(
+        qt_batch=nqb.generate_qt_batch(reference_time=qs.current_time, qs=qs),
+        qs=qs,
+    )
+
+    # Generate output filename
+    latest_forecast = nqb.get_latest_run_start(
+        dt.datetime.now(tz=dt.timezone.utc), qs
+    )
+    output_path = generate_output_filename("gfs_quarter_degree", latest_forecast)
+
+    console.print(f"\n[bold]Fetching data...[/bold]")
+    console.print(f"  Output: [cyan]{output_path}[/cyan]")
+
+    # Fetch data
+    result = ngf.fetch_with_timeout(
+        query_urls=query_urls,
+        output_path=output_path,
+    )
+
+    # Report results
+    if result.success and result.data:
+        console.print(
+            f"\n[bold green]✓ Success![/bold green] "
+            f"Downloaded {len(result.data):,} bytes in {result.total_duration_seconds:.1f}s"
+        )
+        console.print(f"  File: [cyan]{output_path}[/cyan]")
+    else:
+        console.print(
+            f"\n[bold red]✗ Failed[/bold red] after {len(result.attempts)} attempts "
+            f"in {result.total_duration_seconds:.1f}s"
+        )
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def list_presets() -> None:
+    """List available query presets."""
+    console.print("[bold]Available Query Presets:[/bold]\n")
+    for preset in get_available_query_presets():
+        console.print(f"  • {preset}")
+
+
+if __name__ == "__main__":
+    app()
