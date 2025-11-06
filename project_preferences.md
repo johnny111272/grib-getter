@@ -149,6 +149,31 @@ The CLI includes intelligent file management to avoid unnecessary downloads:
 - Force refresh: `--force` (get latest even if cached)
 - Bandwidth monitoring: Check file size before deciding to download
 
+### Data Integrity Protection
+
+**Critical for unreliable connectivity environments**
+
+**Automatic Backup on Overwrite**:
+- Before overwriting any existing file, a backup is automatically created
+- Backup naming: `{original_filename}.{00-99}.bak`
+- Example: `20251106_12_gfs_quarter_degree.grib.00.bak`
+- Sequential numbering: .00.bak, .01.bak, .02.bak, etc.
+- Prevents data loss from corrupted or failed downloads
+
+**Why This Matters**:
+- In bandwidth-limited environments, successful downloads are precious
+- Intermittent connectivity can cause download failures mid-stream
+- A corrupted download should never delete good data from an earlier attempt
+- Backups allow recovery if new download is corrupted
+- Can compare multiple forecast runs from different times
+
+**Behavior**:
+- Backup created automatically when file exists and download proceeds
+- Applies to both `--force` mode and interactive "download" choice
+- Original file renamed to backup before new download starts
+- If download fails, backup can be manually restored
+- Up to 100 backups supported (00-99), then cycles to overwrite .99.bak
+
 ## Future Expansions
 
 ### Adding New Models

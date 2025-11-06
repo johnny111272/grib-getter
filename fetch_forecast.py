@@ -110,6 +110,40 @@ def generate_output_filename(product_name: str, forecast_time: dt.datetime) -> P
     return Path(settings.core_settings.output_dir) / filename
 
 
+def create_backup_file(original_path: Path) -> Path:
+    """
+    Create a backup of an existing file before overwriting.
+
+    Critical for bandwidth-limited environments where corrupted downloads
+    could lose good data from earlier successful downloads.
+
+    Backup naming: {original_name}.{00-99}.bak
+    Finds next available number if multiple backups exist.
+
+    Args:
+        original_path: Path to file that will be backed up
+
+    Returns:
+        Path to created backup file
+    """
+    # Find next available backup number
+    backup_num = 0
+    while backup_num < 100:
+        backup_path = Path(f"{original_path}.{backup_num:02d}.bak")
+        if not backup_path.exists():
+            break
+        backup_num += 1
+    else:
+        # If we've hit 100 backups, overwrite .99.bak
+        backup_path = Path(f"{original_path}.99.bak")
+
+    # Create backup by renaming original
+    original_path.rename(backup_path)
+    console.print(f"  [dim]Created backup: {backup_path.name}[/dim]")
+
+    return backup_path
+
+
 @app.command()
 def fetch(
     preset: Annotated[
@@ -306,6 +340,11 @@ def fetch(
                 console.print("[red]Cancelled[/red]")
                 raise typer.Exit(code=1)
             # choice == "download" falls through to fetch below
+
+    # Create backup of existing file before overwriting
+    if file_exists:
+        console.print(f"\n[bold]Backing up existing file...[/bold]")
+        create_backup_file(output_path)
 
     console.print(f"\n[bold]Fetching data...[/bold]")
 
