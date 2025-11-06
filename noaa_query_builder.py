@@ -307,7 +307,7 @@ if __name__ == "__main__":
             ls=LocationSettings.model_validate(settings.DEFAULT_LOCATION)
         ),
         query_model=QueryModel.model_validate(
-            settings.GFS_SETTINGS.products.gfs_quarter_degree,
+            settings.GFS_PRODUCTS.gfs_quarter_degree,
         ),
         variables=SelectedKeys(
             all_keys=model_data.variables,

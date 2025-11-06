@@ -95,7 +95,7 @@ def prompt_for_location() -> nqb.LocationSettings:
 
 def generate_output_filename(product_name: str, forecast_time: dt.datetime) -> Path:
     """
-    Generate output filename following convention: YYYYMMDDHH_product_name.grib
+    Generate output filename following convention: YYYYMMDD_HH_product_name.grib
 
     Args:
         product_name: Product identifier (e.g., 'gfs_quarter_degree')
@@ -104,8 +104,9 @@ def generate_output_filename(product_name: str, forecast_time: dt.datetime) -> P
     Returns:
         Path to output file in _mutable directory
     """
-    timestamp = forecast_time.strftime("%Y%m%d%H")
-    filename = f"{timestamp}_{product_name}.grib"
+    date_part = forecast_time.strftime("%Y%m%d")
+    hour_part = forecast_time.strftime("%H")
+    filename = f"{date_part}_{hour_part}_{product_name}.grib"
     return Path(settings.core_settings.output_dir) / filename
 
 
@@ -207,7 +208,7 @@ def fetch(
     qs = nqb.QueryStructure(
         bounding_box=nqb.create_bounding_box(ls=location),
         query_model=nqb.QueryModel.model_validate(
-            settings.GFS_SETTINGS.products.gfs_quarter_degree,
+            settings.GFS_PRODUCTS.gfs_quarter_degree,
         ),
         variables=nqb.SelectedKeys(
             all_keys=model_data.variables,

@@ -1,4 +1,4 @@
-[gfs_settings.products.gfs_quarter_degree]
+[gfs_products.gfs_quarter_degree]
 name = "gfs_quarter_degree"
 filter = "filter_gfs_0p25.pl"
 file = "gfs.t{cycle_hour_utc}z.pgrb2.0p25.anl"

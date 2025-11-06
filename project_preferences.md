@@ -30,10 +30,14 @@ Each forecast model has its own TOML configuration file (e.g., `gfs.toml`). This
 - Bitmasks are run against the data lists to efficiently encode selections
 - Allows users to quickly select common variable/level combinations
 
-**`[{model}_settings.products]`** - Available download products
+**`[{model}_products]`** - Available download products
 - Different resolution/processing variants of the same model
 - Example: GFS offers 0.25°, 0.5°, 1° grid spacing products
 - Each product has its own URL pattern, file naming convention, and directory structure
+
+**`[{model}_settings]`** - (Future) Model-specific settings
+- Reserved for other model-specific configuration that doesn't fit above categories
+- Not currently used but available for future expansion
 
 ### Current Implementation: GFS Model
 
@@ -49,16 +53,16 @@ Each forecast model has its own TOML configuration file (e.g., `gfs.toml`). This
 
 Downloaded files follow this pattern:
 ```
-YYYYMMDDHH_product_name.grib
+YYYYMMDD_HH_product_name.grib
 ```
 
 Examples:
-- `2025110606_gfs_quarter_degree.grib` - GFS 0.25° from 2025-11-06 06Z
-- `2025110612_gfs_half_degree.grib` - (future) GFS 0.5° from 2025-11-06 12Z
+- `20251106_06_gfs_quarter_degree.grib` - GFS 0.25° from 2025-11-06 06Z
+- `20251106_12_gfs_half_degree.grib` - (future) GFS 0.5° from 2025-11-06 12Z
 
 **Components**:
 - `YYYYMMDD` - Forecast run date (UTC)
-- `HH` - Forecast cycle hour (00, 06, 12, 18 for GFS)
+- `HH` - Forecast cycle hour (00, 06, 12, 18 for GFS) - emphasized with separate underscore
 - `product_name` - Product identifier from settings
 - `.grib` - GRIB2 format extension
 
@@ -110,12 +114,12 @@ Since only GFS model and `gfs_quarter_degree` product exist:
 
 ### Adding New Models
 1. Create new config file: `{model_name}.toml`
-2. Define `[{model}_data]`, `[{model}_queries]`, `[{model}_settings.products]` sections
+2. Define `[{model}_data]`, `[{model}_queries]`, `[{model}_products]` sections
 3. Add model to CLI selection menu
 4. No code changes required - configuration driven
 
 ### Adding New Products
-1. Add product definition to `[{model}_settings.products.{product_name}]`
+1. Add product definition to `[{model}_products.{product_name}]`
 2. Specify URL patterns, file naming, directory structure
 3. Product automatically appears in CLI options
 
