@@ -11,3 +11,9 @@ wheels/
 
 # Ignore dynaconf secret files
 .secrets.*
+
+# User-specific configuration
+user.toml
+
+# Downloaded GRIB data
+grib_data/

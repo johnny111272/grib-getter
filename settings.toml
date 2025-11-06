@@ -2,7 +2,6 @@
 grib_url = "https://nomads.ncep.noaa.gov/cgi-bin/{filter}"
 forecast_interval_hours = 6
 max_lookback_hours = 18
-output_dir = "/Users/johnny/dev/python/grib-getter/grib_data"
 
 [http_settings]
 success = 200

@@ -55,10 +55,6 @@ def setup_logging() -> None:
     )
 
 
-# Configuration file path
-SETTINGS_FILE = Path("settings.toml")
-
-
 def get_storage_path() -> Path | None:
     """Get configured storage path, or None if not configured."""
     try:
@@ -69,15 +65,18 @@ def get_storage_path() -> Path | None:
 
 def save_storage_path(storage_path: Path) -> None:
     """
-    Save storage path to settings.toml file.
+    Save storage path to user.toml file.
 
-    Creates or updates the core_settings.output_dir value in settings.toml.
+    Separates user configuration (output_dir) from application configuration.
+    This avoids polluting version-controlled settings.toml with user paths.
     """
     import tomli
 
-    # Read current settings
-    if SETTINGS_FILE.exists():
-        with open(SETTINGS_FILE, "rb") as f:
+    user_config_file = Path("user.toml")
+
+    # Read current user config
+    if user_config_file.exists():
+        with open(user_config_file, "rb") as f:
             config = tomli.load(f)
     else:
         config = {}
@@ -89,8 +88,8 @@ def save_storage_path(storage_path: Path) -> None:
     # Update output_dir
     config["core_settings"]["output_dir"] = str(storage_path)
 
-    # Write back to file
-    with open(SETTINGS_FILE, "wb") as f:
+    # Write to user.toml
+    with open(user_config_file, "wb") as f:
         tomli_w.dump(config, f)
 
     console.print(f"[green]✓[/green] Storage path configured: [cyan]{storage_path}[/cyan]")
@@ -132,11 +131,12 @@ def ensure_storage_configured() -> Path:
 
         save_storage_path(storage_path)
 
-        # Reload settings to pick up the new output_dir value
+        # Reload settings to pick up the new output_dir value from user.toml
         from dynaconf import Dynaconf
         settings = Dynaconf(
             envvar_prefix="DYNACONF",
-            settings_files=["settings.toml", ".secrets.toml", "gfs.toml"],
+            settings_files=["settings.toml", "user.toml", ".secrets.toml", "gfs.toml"],
+            merge_enabled=True,
         )
 
     return storage_path
