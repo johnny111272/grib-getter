@@ -2,11 +2,12 @@
 NOAA GFS GRIB2 Data Fetcher
 
 Fetches Global Forecast System (GFS) weather data from NOAA's NOMADS server.
-Implements intelligent retry logic with exponential backoff to find the most
-recent available forecast.
 
-Rate Limiting: NOAA requires 10 seconds between requests for the same file.
-This implementation respects that limit.
+Key features:
+- Intelligent retry logic with exponential backoff
+- Tries most recent forecast first, falls back to older forecasts if unavailable
+- Respects NOAA rate limiting (10 seconds between requests)
+- Comprehensive attempt tracking for debugging
 """
 
 import datetime as dt
@@ -45,7 +46,11 @@ class NOAAServerError(Exception):
 
 
 class FetchAttempt(BaseModel):
-    """Record of a single fetch attempt."""
+    """
+    Record of a single fetch attempt.
+
+    Tracks URL, status code, error type, and timestamp for debugging.
+    """
 
     url: str
     status_code: int | None
@@ -54,7 +59,12 @@ class FetchAttempt(BaseModel):
 
 
 class FetchResult(BaseModel):
-    """Result of fetch operation with metadata."""
+    """
+    Result of fetch operation with metadata.
+
+    Includes data bytes (if successful), all attempt records, success flag,
+    and total duration for performance tracking.
+    """
 
     data: bytes | None
     attempts: list[FetchAttempt]
@@ -98,13 +108,16 @@ def should_retry_status_code(status_code: int) -> bool:
     """
     Determine if HTTP status code warrants a retry.
 
-    404: Data not available yet (common for recent forecasts) - try older
-    5xx: Server error - might be transient, retry
-    2xx/3xx: Success - no retry needed
-    4xx (except 404): Client error - no retry needed
+    Retry strategy:
+    - 404: Don't retry same URL, try next (older) forecast instead
+    - 5xx: Retry (server error, might be transient)
+    - 2xx/3xx: No retry (success)
+    - Other 4xx: No retry (client error, won't be fixed by retrying)
+
+    Returns True if we should retry the same URL with backoff.
     """
     if status_code == settings.http_settings.not_found:
-        return False  # Try next (older) forecast instead
+        return False  # Move to next (older) forecast instead of retrying
 
     return status_code >= settings.http_settings.server_error
 
@@ -225,12 +238,17 @@ def fetch_most_recent_forecast(
     """
     Try each query URL until one succeeds, with retry logic.
 
-    Implements:
-    - Exponential backoff on transient errors (5xx, timeout)
-    - Rate limiting between different forecast times
-    - Comprehensive attempt tracking
+    Implements intelligent fallback: tries most recent forecast first, then
+    progressively older forecasts. Most recent forecasts are often not yet
+    available on NOAA servers, so this fallback is critical.
 
-    Returns FetchResult with data and all attempt metadata.
+    Features:
+    - Exponential backoff on transient errors (5xx, timeout)
+    - Rate limiting between different forecast times (NOAA requirement)
+    - Comprehensive attempt tracking for debugging
+
+    Returns:
+        FetchResult with data (if successful) and all attempt metadata
     """
     start_time = time.time()
     all_attempts: list[FetchAttempt] = []
@@ -240,7 +258,7 @@ def fetch_most_recent_forecast(
     for url in query_urls:
         url_count += 1
 
-        # Rate limiting: wait between requests (except first)
+        # Rate limiting: wait between requests (NOAA requires 10s minimum)
         if not first_url:
             logger.debug(
                 f"Rate limit: waiting {settings.noaa_settings.rate_limit_seconds}s..."
@@ -293,8 +311,11 @@ def fetch_with_timeout(
     """
     Fetch with overall timeout across all retries.
 
-    Useful for critical data where you want to fail after a fixed period
-    rather than exhausting all possible retries.
+    Useful for automated scripts that need predictable failure times
+    rather than exhausting all retries (which could take a long time).
+
+    Note: Uses SIGALRM which only works on Unix systems. On Windows,
+    falls back to no timeout.
     """
     import signal
 
@@ -304,7 +325,7 @@ def fetch_with_timeout(
     def timeout_handler(signum, frame):
         raise TimeoutError(f"Fetch exceeded {timeout_minutes} minute timeout")
 
-    # Set alarm (Unix only - won't work on Windows)
+    # Set alarm (Unix/Mac only - gracefully degrades on Windows)
     try:
         signal.signal(signal.SIGALRM, timeout_handler)
         signal.alarm(int(timeout_minutes * 60))
@@ -326,9 +347,11 @@ def fetch_with_timeout(
 
 
 def main() -> None:
-    """Fetch most recent NOAA GFS forecast data."""
-    # setup_logging()
+    """
+    Fetch most recent NOAA GFS forecast data.
 
+    Example/testing function. Main CLI is in fetch_forecast.py.
+    """
     logger.info("Starting NOAA GFS forecast fetch")
 
     model_data = nqb.ModelData.model_validate(settings.GFS_DATA)

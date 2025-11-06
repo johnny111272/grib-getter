@@ -68,7 +68,11 @@ def get_storage_path() -> Path | None:
 
 
 def save_storage_path(storage_path: Path) -> None:
-    """Save storage path to settings.toml file."""
+    """
+    Save storage path to settings.toml file.
+
+    Creates or updates the core_settings.output_dir value in settings.toml.
+    """
     import tomli
 
     # Read current settings
@@ -95,7 +99,12 @@ def save_storage_path(storage_path: Path) -> None:
 def ensure_storage_configured() -> Path:
     """
     Ensure storage path is configured. Prompts user if not set.
-    Returns the configured storage path.
+
+    First-run setup: prompts for storage directory and saves to settings.
+    Must reload settings after saving to pick up the new configuration.
+
+    Returns:
+        Configured storage path
     """
     global settings
     storage_path = get_storage_path()
@@ -123,7 +132,7 @@ def ensure_storage_configured() -> Path:
 
         save_storage_path(storage_path)
 
-        # Reload settings
+        # Reload settings to pick up the new output_dir value
         from dynaconf import Dynaconf
         settings = Dynaconf(
             envvar_prefix="DYNACONF",
@@ -139,7 +148,11 @@ def get_available_query_presets() -> list[str]:
 
 
 def prompt_for_query_preset() -> str:
-    """Interactively prompt user to select a query preset."""
+    """
+    Interactively prompt user to select a query preset.
+
+    Auto-selects if only one preset available, otherwise shows numbered menu.
+    """
     presets = get_available_query_presets()
 
     if len(presets) == 1:
@@ -160,7 +173,12 @@ def prompt_for_query_preset() -> str:
 
 
 def prompt_for_location() -> nqb.LocationSettings:
-    """Interactively prompt user for location parameters."""
+    """
+    Interactively prompt user for location parameters.
+
+    Uses center point + expanse format (more intuitive than bounding box).
+    Defaults pulled from settings.DEFAULT_LOCATION.
+    """
     console.print("\n[bold]Location Configuration[/bold]")
     console.print("[dim]Using center point + expanse format[/dim]")
 
@@ -247,8 +265,10 @@ def create_backup_file(original_path: Path) -> Path:
     Critical for bandwidth-limited environments where corrupted downloads
     could lose good data from earlier successful downloads.
 
-    Backup naming: {original_name}.{00-99}.bak
-    Finds next available number if multiple backups exist.
+    Backup naming: {original_name}.{NN}.bak where NN is 00 to max_count-1
+    Finds next available number; if all slots used, overwrites the last one.
+
+    Backup settings (max_count, extension) configured in settings.toml.
 
     Args:
         original_path: Path to file that will be backed up
@@ -264,7 +284,7 @@ def create_backup_file(original_path: Path) -> Path:
             break
         backup_num += 1
     else:
-        # If we've hit max backups, overwrite the last one
+        # If all backup slots full, overwrite the last one
         final_backup_num = settings.backup.max_count - 1
         backup_path = Path(f"{original_path}.{final_backup_num:02d}{settings.backup.extension}")
 
@@ -388,7 +408,7 @@ def fetch(
             width_degrees=width,  # type: ignore
         )
 
-    # Build query structure
+    # Display configuration summary
     console.print(f"\n[bold]Configuration:[/bold]")
     console.print(f"  Model: [green]{settings.defaults.model_name}[/green] (auto-selected)")
     console.print(f"  Product: [green]{settings.defaults.product_name}[/green] (auto-selected)")
@@ -398,11 +418,11 @@ def fetch(
         f"({location.width_degrees}° × {location.height_degrees}°)"
     )
 
-    # Load model data and query mask
+    # Load model data and query mask from configuration
     model_data = nqb.ModelData.model_validate(settings.GFS_DATA)
     query_mask = nqb.QueryMask.model_validate(getattr(settings.GFS_QUERIES, preset))
 
-    # Build query structure
+    # Build query structure for NOAA API
     qs = nqb.QueryStructure(
         bounding_box=nqb.create_bounding_box(ls=location),
         query_model=nqb.QueryModel.model_validate(
@@ -422,13 +442,13 @@ def fetch(
         settings=nqb.CoreSettings.model_validate(settings.core_settings),
     )
 
-    # Generate query URLs
+    # Generate query URLs (tries most recent to older forecasts)
     query_urls = nqb.generate_query_urls(
         qt_batch=nqb.generate_qt_batch(reference_time=qs.current_time, qs=qs),
         qs=qs,
     )
 
-    # Generate output filename
+    # Generate output path in run-specific folder
     latest_forecast = nqb.get_latest_run_start(
         dt.datetime.now(tz=dt.timezone.utc), qs
     )
@@ -437,7 +457,7 @@ def fetch(
         product_name=settings.defaults.product_name,
         preset_name=preset,
         forecast_time=latest_forecast,
-        forecast_hour=0,  # 0 for analysis (.anl) file
+        forecast_hour=0,  # Analysis file is hour 000
         storage_path=storage_path,
     )
 
@@ -445,7 +465,7 @@ def fetch(
     console.print(f"  Path: [cyan]{output_path}[/cyan]")
     console.print(f"  Forecast time: [cyan]{latest_forecast.strftime('%Y-%m-%d %H:00 UTC')}[/cyan]")
 
-    # Check if file already exists
+    # Check if file already exists locally
     file_exists = output_path.exists()
     if file_exists:
         file_size = output_path.stat().st_size
@@ -453,7 +473,7 @@ def fetch(
     else:
         console.print(f"  Status: [dim]File does not exist locally[/dim]")
 
-    # Handle check-only mode
+    # Handle check-only mode (no download, just report)
     if check_only:
         console.print(f"\n[bold]Check-only mode:[/bold] No download will be performed")
         if file_exists:
@@ -462,14 +482,15 @@ def fetch(
             console.print(f"[yellow]![/yellow] Latest forecast file not found locally")
         raise typer.Exit(code=0)
 
-    # Handle existing file
+    # Handle existing file (bandwidth optimization)
     if file_exists and not force:
         if new_only:
+            # --new-only flag: skip if file exists (for automated scripts)
             console.print(f"\n[yellow]File exists and --new-only specified. Skipping download.[/yellow]")
             console.print(f"  Using existing file: [cyan]{output_path}[/cyan]")
             raise typer.Exit(code=0)
         else:
-            # Interactive prompt for what to do
+            # Interactive mode: ask user what to do
             console.print(f"\n[bold yellow]File already exists![/bold yellow]")
             choice = Prompt.ask(
                 "What would you like to do?",
@@ -482,9 +503,9 @@ def fetch(
             elif choice == "cancel":
                 console.print("[red]Cancelled[/red]")
                 raise typer.Exit(code=1)
-            # choice == "download" falls through to fetch below
+            # choice == "download" falls through
 
-    # Create backup of existing file before overwriting
+    # Create backup before overwriting (data integrity protection)
     if file_exists:
         console.print(f"\n[bold]Backing up existing file...[/bold]")
         create_backup_file(output_path)
