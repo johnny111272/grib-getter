@@ -1,6 +1,6 @@
 [core_settings]
 grib_url = "https://nomads.ncep.noaa.gov/cgi-bin/{filter}"
-output_dir = "./_mutable"
+# output_dir = "./grib_data"  # Configured on first run or via CLI --configure
 forecast_interval_hours = 6
 max_lookback_hours = 18
 

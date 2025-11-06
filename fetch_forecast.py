@@ -7,12 +7,13 @@ command-line interface.
 """
 
 import datetime as dt
+import tomli_w
 from pathlib import Path
 
 import typer
 from loguru import logger
 from rich.console import Console
-from rich.prompt import Prompt
+from rich.prompt import Prompt, Confirm
 from typing_extensions import Annotated
 
 import noaa_grib_fetcher as ngf
@@ -24,6 +25,84 @@ app = typer.Typer(
     add_completion=False,
 )
 console = Console()
+
+
+# Configuration file path
+SETTINGS_FILE = Path("settings.toml")
+
+
+def get_storage_path() -> Path | None:
+    """Get configured storage path, or None if not configured."""
+    try:
+        return Path(settings.core_settings.output_dir)
+    except (AttributeError, KeyError):
+        return None
+
+
+def save_storage_path(storage_path: Path) -> None:
+    """Save storage path to settings.toml file."""
+    import tomli
+
+    # Read current settings
+    if SETTINGS_FILE.exists():
+        with open(SETTINGS_FILE, "rb") as f:
+            config = tomli.load(f)
+    else:
+        config = {}
+
+    # Ensure core_settings section exists
+    if "core_settings" not in config:
+        config["core_settings"] = {}
+
+    # Update output_dir
+    config["core_settings"]["output_dir"] = str(storage_path)
+
+    # Write back to file
+    with open(SETTINGS_FILE, "wb") as f:
+        tomli_w.dump(config, f)
+
+    console.print(f"[green]✓[/green] Storage path configured: [cyan]{storage_path}[/cyan]")
+
+
+def ensure_storage_configured() -> Path:
+    """
+    Ensure storage path is configured. Prompts user if not set.
+    Returns the configured storage path.
+    """
+    storage_path = get_storage_path()
+
+    if storage_path is None:
+        console.print("\n[bold yellow]First-time setup required[/bold yellow]")
+        console.print("Please configure where GRIB files should be stored.\n")
+
+        default_path = Path.cwd() / "grib_data"
+        path_input = Prompt.ask(
+            "Storage directory for GRIB files",
+            default=str(default_path),
+        )
+
+        storage_path = Path(path_input).expanduser().resolve()
+
+        # Create directory if it doesn't exist
+        if not storage_path.exists():
+            if Confirm.ask(f"Directory doesn't exist. Create {storage_path}?", default=True):
+                storage_path.mkdir(parents=True, exist_ok=True)
+                console.print(f"[green]✓[/green] Created directory: {storage_path}")
+            else:
+                console.print("[red]Setup cancelled[/red]")
+                raise typer.Exit(code=1)
+
+        save_storage_path(storage_path)
+
+        # Reload settings
+        from dynaconf import Dynaconf
+        global settings
+        settings = Dynaconf(
+            envvar_prefix="DYNACONF",
+            settings_files=["settings.toml", ".secrets.toml", "gfs.toml"],
+        )
+
+    return storage_path
 
 
 def get_available_query_presets() -> list[str]:
@@ -93,21 +172,26 @@ def prompt_for_location() -> nqb.LocationSettings:
     )
 
 
-def generate_output_filename(product_name: str, forecast_time: dt.datetime) -> Path:
+def generate_output_filename(
+    product_name: str,
+    forecast_time: dt.datetime,
+    storage_path: Path,
+) -> Path:
     """
     Generate output filename following convention: YYYYMMDD_HH_product_name.grib
 
     Args:
         product_name: Product identifier (e.g., 'gfs_quarter_degree')
         forecast_time: Forecast run datetime
+        storage_path: Directory where GRIB files are stored
 
     Returns:
-        Path to output file in _mutable directory
+        Path to output file in storage directory
     """
     date_part = forecast_time.strftime("%Y%m%d")
     hour_part = forecast_time.strftime("%H")
     filename = f"{date_part}_{hour_part}_{product_name}.grib"
-    return Path(settings.core_settings.output_dir) / filename
+    return storage_path / filename
 
 
 def create_backup_file(original_path: Path) -> Path:
@@ -223,7 +307,10 @@ def fetch(
         # Check what's available without downloading
         python fetch_forecast.py fetch -p sailing_basic --check-only
     """
-    console.print("[bold blue]NOAA Weather Forecast Fetcher[/bold blue]\n")
+    console.print("[bold blue]grib-getter: NOAA Weather Forecast Fetcher[/bold blue]\n")
+
+    # Ensure storage path is configured (first-run setup if needed)
+    storage_path = ensure_storage_configured()
 
     # Determine if we need interactive prompts
     need_preset = preset is None
@@ -296,7 +383,7 @@ def fetch(
     latest_forecast = nqb.get_latest_run_start(
         dt.datetime.now(tz=dt.timezone.utc), qs
     )
-    output_path = generate_output_filename("gfs_quarter_degree", latest_forecast)
+    output_path = generate_output_filename("gfs_quarter_degree", latest_forecast, storage_path)
 
     console.print(f"\n[bold]Target file:[/bold]")
     console.print(f"  Path: [cyan]{output_path}[/cyan]")
@@ -375,6 +462,62 @@ def list_presets() -> None:
     console.print("[bold]Available Query Presets:[/bold]\n")
     for preset in get_available_query_presets():
         console.print(f"  • {preset}")
+
+
+@app.command()
+def configure(
+    storage_path: Annotated[
+        str | None,
+        typer.Option(
+            "--storage",
+            "-s",
+            help="Set GRIB file storage directory path",
+        ),
+    ] = None,
+) -> None:
+    """
+    Configure grib-getter settings.
+
+    Use this to set or change the GRIB file storage directory.
+    If no path provided, will prompt interactively.
+
+    Examples:
+        # Interactive configuration
+        grib-getter configure
+
+        # Set storage path directly
+        grib-getter configure --storage /path/to/grib_data
+    """
+    console.print("[bold blue]grib-getter Configuration[/bold blue]\n")
+
+    if storage_path is None:
+        # Interactive mode
+        current_path = get_storage_path()
+        if current_path:
+            console.print(f"Current storage path: [cyan]{current_path}[/cyan]\n")
+
+        default_path = current_path or Path.cwd() / "grib_data"
+        path_input = Prompt.ask(
+            "Storage directory for GRIB files",
+            default=str(default_path),
+        )
+        storage_path = path_input
+
+    # Convert to Path and expand/resolve
+    new_path = Path(storage_path).expanduser().resolve()
+
+    # Create directory if it doesn't exist
+    if not new_path.exists():
+        if Confirm.ask(f"\nDirectory doesn't exist. Create {new_path}?", default=True):
+            new_path.mkdir(parents=True, exist_ok=True)
+            console.print(f"[green]✓[/green] Created directory: {new_path}")
+        else:
+            console.print("[red]Configuration cancelled[/red]")
+            raise typer.Exit(code=1)
+
+    # Save configuration
+    save_storage_path(new_path)
+    console.print("\n[green]✓ Configuration complete![/green]")
 
 
 if __name__ == "__main__":

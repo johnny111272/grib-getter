@@ -1,1 +1,0 @@
-/Users/johnny/.claude/programmer_preferences.md

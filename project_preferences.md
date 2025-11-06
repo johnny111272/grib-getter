@@ -1,15 +1,47 @@
-# Weather Model Project Documentation
+# grib-getter Project Documentation
 
 ## About This Document
-**PURPOSE**: Documents project-specific behaviors, architecture decisions, and expansion patterns for the weather data fetcher.
+**PURPOSE**: Documents project-specific behaviors, architecture decisions, and expansion patterns for grib-getter, a bandwidth-optimized GRIB weather data fetcher.
 
-**SCOPE**: This is project-specific documentation. General programming preferences are in `programmer_preferences.md`.
+**SCOPE**: This is project-specific documentation covering architecture, configuration patterns, and future expansion plans.
 
 ---
 
 ## Architecture Overview
 
-This project fetches weather forecast data from various numerical weather prediction models (currently NOAA). The architecture is designed for extensibility as new models and products are added.
+**grib-getter** is a bandwidth-optimized CLI tool for fetching GRIB weather forecast data from NOAA's GFS model. Designed specifically for bandwidth-limited and intermittent connectivity environments (like sailboat liveaboards), it includes intelligent download management and automatic data integrity protection.
+
+The architecture is designed for extensibility as new models and products are added.
+
+## Installation & Configuration
+
+### First-Run Setup
+
+On first run, grib-getter prompts for storage directory configuration:
+
+```bash
+python fetch_forecast.py fetch
+# Prompts: "Storage directory for GRIB files"
+# Default: ./grib_data
+```
+
+### Manual Configuration
+
+```bash
+# Interactive configuration
+python fetch_forecast.py configure
+
+# Direct configuration
+python fetch_forecast.py configure --storage /path/to/grib_data
+```
+
+### Reconfiguration
+
+To reconfigure storage location:
+1. Delete `output_dir` line from `settings.toml`, OR
+2. Run `python fetch_forecast.py configure` again
+
+This "delete to reconfigure" approach is simple and bulletproof - ensures users can always fix incorrect paths.
 
 ## Configuration Structure
 
