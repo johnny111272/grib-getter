@@ -17,8 +17,8 @@ Designed for bandwidth-limited environments (like sailboat liveaboards) with int
 
 ```bash
 # Clone the repository
-git clone https://github.com/johnny111272/weather-model.git
-cd weather-model
+git clone https://github.com/johnny111272/grib-getter.git
+cd grib-getter
 
 # Install with uv (recommended)
 uv sync
@@ -107,8 +107,8 @@ Query presets are defined in `gfs.toml`. Currently available:
 Downloaded files follow the pattern: `YYYYMMDD_HH_product.grib`
 
 Examples:
-- `20251106_06_gfs_quarter_degree.grib` - GFS 0.25° from 2025-11-06 06Z
-- `20251106_12_gfs_quarter_degree.grib` - GFS 0.25° from 2025-11-06 12Z
+- `20251106_06_gfs_quarter_degree.grib` - GFS 0.25ï¿½ from 2025-11-06 06Z
+- `20251106_12_gfs_quarter_degree.grib` - GFS 0.25ï¿½ from 2025-11-06 12Z
 
 ## Backup Protection
 
