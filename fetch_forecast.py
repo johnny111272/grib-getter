@@ -57,7 +57,7 @@ def setup_logging() -> None:
 def get_storage_path() -> Path | None:
     """Get configured storage path, or None if not configured."""
     try:
-        return Path(settings.core_settings.output_dir)
+        return Path(settings.core_settings.output_dir)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
     except (AttributeError, KeyError):
         return None
 
@@ -113,10 +113,10 @@ def ensure_storage_configured() -> Path:
         console.print("\n[bold yellow]First-time setup required[/bold yellow]")
         console.print("Please configure where GRIB files should be stored.\n")
 
-        default_path = Path.cwd() / settings.defaults.grib_dir
+        default_path = Path.cwd() / settings.defaults.grib_dir  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         path_input = Prompt.ask(
             "Storage directory for GRIB files",
-            default=str(default_path),
+            default=str(default_path),  # pyright: ignore[reportUnknownArgumentType]
         )
 
         storage_path = Path(path_input).expanduser().resolve()
@@ -135,7 +135,7 @@ def ensure_storage_configured() -> Path:
         save_storage_path(storage_path)
 
         # Reload settings to pick up the new output_dir value from user.toml
-        from dynaconf import Dynaconf
+        from dynaconf import Dynaconf  # pyright: ignore[reportMissingTypeStubs]
 
         settings = Dynaconf(
             envvar_prefix="DYNACONF",
@@ -153,7 +153,7 @@ def ensure_storage_configured() -> Path:
 
 def get_available_query_presets() -> list[str]:
     """Get list of available query preset names from GFS settings."""
-    return list(settings.GFS_QUERIES.keys())
+    return list(settings.GFS_QUERIES.keys())  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
 
 
 def prompt_for_query_preset() -> str:
@@ -192,30 +192,30 @@ def prompt_for_location() -> nqb.LocationSettings:
     console.print("[dim]Using center point + expanse format[/dim]")
 
     # Get defaults from settings
-    defaults = settings.DEFAULT_LOCATION
+    defaults = settings.DEFAULT_LOCATION  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
     center_lat = float(
         Prompt.ask(
             "Center latitude (-90 to 90)",
-            default=str(defaults.center_lat),
+            default=str(defaults.center_lat),  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
         )
     )
     center_lon = float(
         Prompt.ask(
             "Center longitude (-180 to 180)",
-            default=str(defaults.center_lon),
+            default=str(defaults.center_lon),  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
         )
     )
     height_degrees = float(
         Prompt.ask(
             "Height in degrees",
-            default=str(defaults.height_degrees),
+            default=str(defaults.height_degrees),  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
         )
     )
     width_degrees = float(
         Prompt.ask(
             "Width in degrees",
-            default=str(defaults.width_degrees),
+            default=str(defaults.width_degrees),  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
         )
     )
 
@@ -229,7 +229,7 @@ def prompt_for_location() -> nqb.LocationSettings:
 
 def generate_output_filename(
     model_name: str,
-    product_name: str,
+    product_name: str,  # pyright: ignore[reportUnusedParameter]
     preset_name: str,
     forecast_time: dt.datetime,
     forecast_hour: int,
@@ -289,18 +289,18 @@ def create_backup_file(original_path: Path) -> Path:
     """
     # Find next available backup number
     backup_num = 0
-    while backup_num < settings.backup.max_count:
+    while backup_num < settings.backup.max_count:  # pyright: ignore[reportUnknownMemberType]
         backup_path = Path(
-            f"{original_path}.{backup_num:02d}{settings.backup.extension}"
+            f"{original_path}.{backup_num:02d}{settings.backup.extension}"  # pyright: ignore[reportUnknownMemberType]
         )
         if not backup_path.exists():
             break
         backup_num += 1
     else:
         # If all backup slots full, overwrite the last one
-        final_backup_num = settings.backup.max_count - 1
+        final_backup_num = settings.backup.max_count - 1  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         backup_path = Path(
-            f"{original_path}.{final_backup_num:02d}{settings.backup.extension}"
+            f"{original_path}.{final_backup_num:02d}{settings.backup.extension}"  # pyright: ignore[reportUnknownMemberType]
         )
 
     # Create backup by renaming original
@@ -426,39 +426,39 @@ def fetch(
     # Display configuration summary
     console.print("\n[bold]Configuration:[/bold]")
     console.print(
-        f"  Model: [green]{settings.defaults.model_name}[/green] (auto-selected)"
+        f"  Model: [green]{settings.defaults.model_name}[/green] (auto-selected)"  # pyright: ignore[reportUnknownMemberType]
     )
     console.print(
-        f"  Product: [green]{settings.defaults.product_name}[/green] (auto-selected)"
+        f"  Product: [green]{settings.defaults.product_name}[/green] (auto-selected)"  # pyright: ignore[reportUnknownMemberType]
     )
     console.print(f"  Preset: [green]{preset}[/green]")
     console.print(
-        f"  Location: [green]{location.center_lat}, {location.center_lon}[/green] "
+        f"  Location: [green]{location.center_lat}, {location.center_lon}[/green] "  # pyright: ignore[reportImplicitStringConcatenation]
         f"({location.width_degrees}° × {location.height_degrees}°)"
     )
 
     # Load model data and query mask from configuration
-    model_data = nqb.ModelData.model_validate(settings.GFS_DATA)
-    query_mask = nqb.QueryMask.model_validate(getattr(settings.GFS_QUERIES, preset))
+    model_data = nqb.ModelData.model_validate(settings.GFS_DATA)  # pyright: ignore[reportUnknownMemberType]
+    query_mask = nqb.QueryMask.model_validate(getattr(settings.GFS_QUERIES, preset))  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
 
     # Build query structure for NOAA API
     qs = nqb.QueryStructure(
         bounding_box=nqb.create_bounding_box(ls=location),
         query_model=nqb.QueryModel.model_validate(
-            settings.GFS_PRODUCTS.gfs_quarter_degree,
+            settings.GFS_PRODUCTS.gfs_quarter_degree,  # pyright: ignore[reportUnknownMemberType]
         ),
         variables=nqb.SelectedKeys(
             all_keys=model_data.variables,
             hex_mask=query_mask.variables,
-            prefix=settings.query.var_prefix,
+            prefix=settings.query.var_prefix,  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
         ),
         levels=nqb.SelectedKeys(
             all_keys=model_data.levels,
             hex_mask=query_mask.levels,
-            prefix=settings.query.lev_prefix,
+            prefix=settings.query.lev_prefix,  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
         ),
         current_time=dt.datetime.now(tz=dt.timezone.utc),
-        settings=nqb.CoreSettings.model_validate(settings.core_settings),
+        settings=nqb.CoreSettings.model_validate(settings.core_settings),  # pyright: ignore[reportUnknownMemberType]
     )
 
     # Generate query URLs (tries most recent to older forecasts)
@@ -470,8 +470,8 @@ def fetch(
     # Generate output path in run-specific folder
     latest_forecast = nqb.get_latest_run_start(dt.datetime.now(tz=dt.timezone.utc), qs)
     output_path = generate_output_filename(
-        model_name=settings.defaults.model_name,
-        product_name=settings.defaults.product_name,
+        model_name=settings.defaults.model_name,  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+        product_name=settings.defaults.product_name,  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
         preset_name=preset,
         forecast_time=latest_forecast,
         forecast_hour=0,  # Analysis file is hour 000
@@ -544,13 +544,13 @@ def fetch(
     # Report results
     if result.success and result.data:
         console.print(
-            f"\n[bold green]✓ Success![/bold green] "
+            f"\n[bold green]✓ Success![/bold green] "  # pyright: ignore[reportImplicitStringConcatenation]
             f"Downloaded {len(result.data):,} bytes in {result.total_duration_seconds:.1f}s"
         )
         console.print(f"  File: [cyan]{output_path}[/cyan]")
     else:
         console.print(
-            f"\n[bold red]✗ Failed[/bold red] after {len(result.attempts)} attempts "
+            f"\n[bold red]✗ Failed[/bold red] after {len(result.attempts)} attempts "  # pyright: ignore[reportImplicitStringConcatenation]
             f"in {result.total_duration_seconds:.1f}s"
         )
         raise typer.Exit(code=1)
@@ -598,10 +598,10 @@ def configure(
         if current_path:
             console.print(f"Current storage path: [cyan]{current_path}[/cyan]\n")
 
-        default_path = current_path or Path.cwd() / settings.defaults.grib_dir
+        default_path = current_path or Path.cwd() / settings.defaults.grib_dir  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         path_input = Prompt.ask(
             "Storage directory for GRIB files",
-            default=str(default_path),
+            default=str(default_path),  # pyright: ignore[reportUnknownArgumentType]
         )
         storage_path = path_input
 

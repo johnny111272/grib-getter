@@ -88,18 +88,18 @@ def calculate_exponential_backoff(
     """
     import random
 
-    if initial_delay is None:  # pyright: ignore[reportUnknownMemberType]
-        initial_delay = settings.retry_settings.initial_delay_seconds  # pyright: ignore[reportUnknownMemberType]
-    if max_delay is None:  # pyright: ignore[reportUnknownMemberType]
-        max_delay = settings.retry_settings.max_delay_seconds  # pyright: ignore[reportUnknownMemberType]
+    if initial_delay is None:
+        initial_delay = settings.retry_settings.initial_delay_seconds  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    if max_delay is None:
+        max_delay = settings.retry_settings.max_delay_seconds  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
     # Exponential backoff: 2^attempt * initial_delay, capped at max_delay
-    delay = min(initial_delay * (2**attempt), max_delay)  # pyright: ignore[reportArgumentType]
+    delay = min(initial_delay * (2**attempt), max_delay)  # pyright: ignore[reportArgumentType, reportUnknownArgumentType, reportUnknownVariableType]
 
     # Add jitter: ±20% of calculated delay to prevent thundering herd
     jitter_percent = 0.2
-    jitter = delay * jitter_percent * (2 * random.random() - 1)
-    return delay + jitter
+    jitter = delay * jitter_percent * (2 * random.random() - 1)  # pyright: ignore[reportUnknownVariableType]
+    return delay + jitter  # pyright: ignore[reportUnknownVariableType]
 
 
 def should_retry_status_code(status_code: int) -> bool:
@@ -114,10 +114,10 @@ def should_retry_status_code(status_code: int) -> bool:
 
     Returns True if we should retry the same URL with backoff.
     """
-    if status_code == settings.http_settings.not_found:
+    if status_code == settings.http_settings.not_found:  # pyright: ignore[reportUnknownMemberType]
         return False  # Move to next (older) forecast instead of retrying
 
-    return status_code >= settings.http_settings.server_error
+    return status_code >= settings.http_settings.server_error  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
 
 # =============================================================================
@@ -146,21 +146,21 @@ def fetch_with_retry(
 
         response = httpx.get(
             url,
-            timeout=settings.http_settings.request_timeout_seconds,
+            timeout=settings.http_settings.request_timeout_seconds,  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
             follow_redirects=True,
         )
 
         attempt.status_code = response.status_code
 
-        if response.status_code == settings.http_settings.success:
+        if response.status_code == settings.http_settings.success:  # pyright: ignore[reportUnknownMemberType]
             logger.info(f"Success: {len(response.content):,} bytes received")
             return response, attempt
 
-        elif response.status_code == settings.http_settings.not_found:
+        elif response.status_code == settings.http_settings.not_found:  # pyright: ignore[reportUnknownMemberType]
             logger.warning("Data not found (404) - forecast likely not available yet")
             return None, attempt
 
-        elif response.status_code >= settings.http_settings.server_error:
+        elif response.status_code >= settings.http_settings.server_error:  # pyright: ignore[reportUnknownMemberType]
             logger.error(f"Server error ({response.status_code})")
             attempt.error_type = "server_error"
             return None, attempt
@@ -172,7 +172,7 @@ def fetch_with_retry(
 
     except httpx.TimeoutException:
         logger.error(
-            f"Request timeout after {settings.http_settings.request_timeout_seconds}s"
+            f"Request timeout after {settings.http_settings.request_timeout_seconds}s"  # pyright: ignore[reportUnknownMemberType]
         )
         attempt.error_type = "timeout"
         return None, attempt
@@ -198,8 +198,8 @@ def fetch_with_exponential_backoff(
     Only retries on transient errors (5xx, timeout, network).
     Does not retry on 404 or other client errors.
     """
-    if max_attempts is None:  # pyright: ignore[reportUnknownMemberType]
-        max_attempts = settings.retry_settings.max_attempts  # pyright: ignore[reportUnknownMemberType]
+    if max_attempts is None:
+        max_attempts = settings.retry_settings.max_attempts  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
     attempts: list[FetchAttempt] = []
 
@@ -259,9 +259,9 @@ def fetch_most_recent_forecast(
         # Rate limiting: wait between requests (NOAA requires 10s minimum)
         if not first_url:
             logger.debug(
-                f"Rate limit: waiting {settings.noaa_settings.rate_limit_seconds}s..."
+                f"Rate limit: waiting {settings.noaa_settings.rate_limit_seconds}s..."  # pyright: ignore[reportUnknownMemberType]
             )
-            time.sleep(settings.noaa_settings.rate_limit_seconds)
+            time.sleep(settings.noaa_settings.rate_limit_seconds)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
         first_url = False
 
         # Try this URL with retry logic
@@ -270,7 +270,7 @@ def fetch_most_recent_forecast(
 
         if (
             response is not None
-            and response.status_code == settings.http_settings.success
+            and response.status_code == settings.http_settings.success  # pyright: ignore[reportUnknownMemberType]
         ):
             # Success! Save and return
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -289,7 +289,7 @@ def fetch_most_recent_forecast(
     # All URLs failed
     duration = time.time() - start_time
     logger.error(
-        f"Failed to fetch forecast after {len(all_attempts)} attempts "
+        f"Failed to fetch forecast after {len(all_attempts)} attempts "  # pyright: ignore[reportImplicitStringConcatenation]
         f"across {url_count} forecast times"
     )
 
@@ -317,16 +317,16 @@ def fetch_with_timeout(
     """
     import signal
 
-    if timeout_minutes is None:  # pyright: ignore[reportUnknownMemberType]
-        timeout_minutes = settings.retry_settings.timeout_minutes  # pyright: ignore[reportUnknownMemberType]
+    if timeout_minutes is None:
+        timeout_minutes = settings.retry_settings.timeout_minutes  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
-    def timeout_handler(signum, frame):  # pyright: ignore[reportUnusedParameter, reportMissingParameterType]
+    def timeout_handler(signum, frame):  # pyright: ignore[reportUnusedParameter, reportMissingParameterType, reportUnknownParameterType]
         raise TimeoutError(f"Fetch exceeded {timeout_minutes} minute timeout")
 
     # Set alarm (Unix/Mac only - gracefully degrades on Windows)
     try:
         _ = signal.signal(signal.SIGALRM, timeout_handler)  # pyright: ignore[reportUnknownArgumentType]
-        _ = signal.alarm(int(timeout_minutes * 60))  # pyright: ignore[reportOptionalOperand]
+        _ = signal.alarm(int(timeout_minutes * 60))  # pyright: ignore[reportOptionalOperand, reportUnknownArgumentType]
 
         result = fetch_most_recent_forecast(query_urls, output_path)
 
