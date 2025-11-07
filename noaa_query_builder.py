@@ -385,39 +385,3 @@ def generate_query_urls(
     for qt in qt_batch:
         qa = collect_query_arguments(qs=qs)
         yield build_query_url(qt=qt, qa=qa, qs=qs)
-
-
-###############################################################################
-
-if __name__ == "__main__":
-    model_data = ModelData.model_validate(settings.GFS_DATA)
-    query_mask = QueryMask.model_validate(settings.GFS_QUERIES.sailing_basic)
-    default_location = LocationSettings.model_validate(settings.DEFAULT_LOCATION)
-
-    qs = QueryStructure(
-        bounding_box=create_bounding_box(
-            ls=LocationSettings.model_validate(settings.DEFAULT_LOCATION)
-        ),
-        query_model=QueryModel.model_validate(
-            settings.GFS_PRODUCTS.gfs_quarter_degree,
-        ),
-        variables=SelectedKeys(
-            all_keys=model_data.variables,
-            hex_mask=query_mask.variables,
-            prefix="var_",
-        ),
-        levels=SelectedKeys(
-            all_keys=model_data.levels,
-            hex_mask=query_mask.levels,
-            prefix="lev_",
-        ),
-        current_time=datetime.now(tz=timezone.utc),
-        settings=CoreSettings.model_validate(settings.core_settings),
-    )
-
-    query_urls_generator = generate_query_urls(
-        qt_batch=generate_qt_batch(reference_time=qs.current_time, qs=qs),
-        qs=qs,
-    )
-
-    print(tuple(query_urls_generator))

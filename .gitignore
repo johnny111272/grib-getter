@@ -20,3 +20,8 @@ grib_data/
 
 # MkDocs build output
 site/
+
+# Development and testing files (not shared to repository)
+development.py
+development.ipynb
+.ipynb_checkpoints/
