@@ -172,7 +172,11 @@ Built with:
 
 ## License
 
-MIT
+GNU Affero General Public License v3.0 (AGPL-3.0)
+
+This project is free and open source software. You can use, modify, and distribute it freely, but if you distribute modified versions (including running it as a network service), you must share your changes under the same license. This ensures improvements benefit the entire community.
+
+See [LICENSE](LICENSE) for full details.
 
 ## Author
 
