@@ -43,7 +43,7 @@ def setup_logging() -> None:
     logger.remove()
 
     # Add rich handler for beautiful console output
-    logger.add(
+    _ = logger.add(
         RichHandler(
             console=console,
             rich_tracebacks=True,
@@ -304,7 +304,7 @@ def create_backup_file(original_path: Path) -> Path:
         )
 
     # Create backup by renaming original
-    original_path.rename(backup_path)
+    _ = original_path.rename(backup_path)
     console.print(f"  [dim]Created backup: {backup_path.name}[/dim]")
 
     return backup_path
@@ -409,18 +409,18 @@ def fetch(
             location = prompt_for_location()
         else:
             location = nqb.LocationSettings(
-                center_lat=lat,  # type: ignore
-                center_lon=lon,  # type: ignore
-                height_degrees=height,  # type: ignore
-                width_degrees=width,  # type: ignore
+                center_lat=lat,  # pyright: ignore[reportArgumentType]
+                center_lon=lon,  # pyright: ignore[reportArgumentType]
+                height_degrees=height,  # pyright: ignore[reportArgumentType]
+                width_degrees=width,  # pyright: ignore[reportArgumentType]
             )
     else:
         # Fully non-interactive
         location = nqb.LocationSettings(
-            center_lat=lat,  # type: ignore
-            center_lon=lon,  # type: ignore
-            height_degrees=height,  # type: ignore
-            width_degrees=width,  # type: ignore
+            center_lat=lat,  # pyright: ignore[reportArgumentType]
+            center_lon=lon,  # pyright: ignore[reportArgumentType]
+            height_degrees=height,  # pyright: ignore[reportArgumentType]
+            width_degrees=width,  # pyright: ignore[reportArgumentType]
         )
 
     # Display configuration summary
@@ -531,7 +531,7 @@ def fetch(
     # Create backup before overwriting (data integrity protection)
     if file_exists:
         console.print("\n[bold]Backing up existing file...[/bold]")
-        create_backup_file(output_path)
+        _ = create_backup_file(output_path)
 
     console.print("\n[bold]Fetching data...[/bold]")
 

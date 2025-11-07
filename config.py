@@ -1,4 +1,4 @@
-from dynaconf import Dynaconf
+from dynaconf import Dynaconf  # pyright: ignore[reportMissingTypeStubs]
 
 settings = Dynaconf(
     envvar_prefix="DYNACONF",

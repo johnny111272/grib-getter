@@ -35,4 +35,8 @@ docs = [
 dev = [
     "ruff>=0.8.0",
     "basedpyright>=1.22.0",
+    "pre-commit>=4.0.0",
 ]
+
+[tool.basedpyright]
+exclude = ["development.py", "development.ipynb", ".venv", "**/__pycache__"]
