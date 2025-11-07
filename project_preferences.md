@@ -43,6 +43,115 @@ To reconfigure storage location:
 
 This "delete to reconfigure" approach is simple and bulletproof - ensures users can always fix incorrect paths.
 
+## Development Setup
+
+### Code Quality Tools
+
+**Linting and Formatting:**
+- **ruff** (>=0.8.0) - Fast Python linter and formatter
+  - Replaces multiple tools (flake8, black, isort, etc.)
+  - Auto-fixes issues with `--fix` flag
+
+**Type Checking:**
+- **basedpyright** (>=1.22.0) - Fast Python type checker
+  - Fork of pyright with additional features
+  - Configured to exclude `development.py` (gitignored scratch file)
+
+**Automation:**
+- **pre-commit** (>=4.0.0) - Git hooks for automated checks
+  - Runs on every commit automatically
+  - Enforces code quality before changes are committed
+
+### Installing Development Tools
+
+```bash
+# Install all dev dependencies
+uv sync --extra dev
+
+# Install pre-commit hooks (one-time setup)
+uv run pre-commit install
+```
+
+### Pre-commit Configuration
+
+Located in `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.4
+    hooks:
+      - id: ruff
+        args: [--fix]  # Auto-fix issues
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: basedpyright
+        name: basedpyright
+        entry: uv run basedpyright --level error
+        language: system
+        types: [python]
+        pass_filenames: false
+```
+
+**What happens on every commit:**
+1. Ruff automatically fixes linting issues
+2. Ruff formats code consistently
+3. Basedpyright checks for type errors (fails only on errors, not warnings)
+
+### Type Checking Strategy
+
+**Initial Approach - Suppress with Specific Types:**
+```python
+# Suppress warnings with specific warning types for future systematic addressing
+from dynaconf import Dynaconf  # pyright: ignore[reportMissingTypeStubs]
+
+def foo(x):  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+    ...
+```
+
+**Common Warning Types:**
+- `reportMissingTypeStubs` - External library missing type information (dynaconf)
+- `reportUnknownMemberType` - Dynamic attribute access (settings.*)
+- `reportArgumentType` - Type mismatch in function arguments
+- `reportOptionalOperand` - Operations on Optional types
+- `reportUnusedParameter` - Unused function parameters (e.g., signal handlers)
+- `reportUnknownArgumentType` - Type propagation issues
+
+**Later Approach - Systematic Resolution:**
+1. Un-ignore one warning type at a time
+2. Find best solution:
+   - Pydantic validation for data structures
+   - Type narrowing with assertions
+   - Custom type stubs for external libraries
+   - Architecture changes if needed
+
+**Current Status:**
+- 0 errors, 107 warnings (all suppressed with specific types)
+- Documented technical debt to address systematically
+
+### Manual Testing Commands
+
+```bash
+# Run linting and formatting manually
+uv run ruff check --fix .
+uv run ruff format .
+
+# Run type checking manually
+uv run basedpyright .
+
+# Run all pre-commit hooks on all files (without committing)
+uv run pre-commit run --all-files
+```
+
+### Development File
+
+`development.py` (gitignored) is available for ad-hoc testing and experimentation:
+- Contains test functions from removed `main()` functions in library modules
+- Safe to modify and break
+- Excluded from type checking and git tracking
+
 ## Configuration Structure
 
 ### File Organization
