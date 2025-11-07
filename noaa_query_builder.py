@@ -17,8 +17,6 @@ from urllib.parse import urlencode
 
 import pydantic
 
-from config import settings
-
 
 class ModelData(pydantic.BaseModel, frozen=True):
     """

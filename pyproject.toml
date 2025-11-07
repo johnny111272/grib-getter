@@ -12,7 +12,7 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Atmospheric Science",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
@@ -31,4 +31,8 @@ docs = [
     "mkdocs>=1.6.0",
     "mkdocs-material>=9.5.0",
     "mkdocstrings[python]>=0.26.0",
+]
+dev = [
+    "ruff>=0.8.0",
+    "basedpyright>=1.22.0",
 ]

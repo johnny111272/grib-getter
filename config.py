@@ -3,10 +3,10 @@ from dynaconf import Dynaconf
 settings = Dynaconf(
     envvar_prefix="DYNACONF",
     settings_files=[
-        "settings.toml",      # Application defaults
-        "user.toml",          # User-specific config (e.g., output_dir)
-        ".secrets.toml",      # Secrets (API keys, etc.)
-        "settings/*.toml",    # Model configs auto-discovered (gfs.toml, nam.toml, etc.)
+        "settings.toml",  # Application defaults
+        "user.toml",  # User-specific config (e.g., output_dir)
+        ".secrets.toml",  # Secrets (API keys, etc.)
+        "settings/*.toml",  # Model configs auto-discovered (gfs.toml, nam.toml, etc.)
     ],
     merge_enabled=True,  # Merge nested dictionaries instead of replacing
 )

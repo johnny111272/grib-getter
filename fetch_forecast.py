@@ -7,7 +7,6 @@ command-line interface.
 """
 
 import datetime as dt
-import sys
 from pathlib import Path
 
 import tomli_w
@@ -92,7 +91,9 @@ def save_storage_path(storage_path: Path) -> None:
     with open(user_config_file, "wb") as f:
         tomli_w.dump(config, f)
 
-    console.print(f"[green]✓[/green] Storage path configured: [cyan]{storage_path}[/cyan]")
+    console.print(
+        f"[green]✓[/green] Storage path configured: [cyan]{storage_path}[/cyan]"
+    )
 
 
 def ensure_storage_configured() -> Path:
@@ -122,7 +123,9 @@ def ensure_storage_configured() -> Path:
 
         # Create directory if it doesn't exist
         if not storage_path.exists():
-            if Confirm.ask(f"Directory doesn't exist. Create {storage_path}?", default=True):
+            if Confirm.ask(
+                f"Directory doesn't exist. Create {storage_path}?", default=True
+            ):
                 storage_path.mkdir(parents=True, exist_ok=True)
                 console.print(f"[green]✓[/green] Created directory: {storage_path}")
             else:
@@ -133,9 +136,15 @@ def ensure_storage_configured() -> Path:
 
         # Reload settings to pick up the new output_dir value from user.toml
         from dynaconf import Dynaconf
+
         settings = Dynaconf(
             envvar_prefix="DYNACONF",
-            settings_files=["settings.toml", "user.toml", ".secrets.toml", "settings/*.toml"],
+            settings_files=[
+                "settings.toml",
+                "user.toml",
+                ".secrets.toml",
+                "settings/*.toml",
+            ],
             merge_enabled=True,
         )
 
@@ -253,7 +262,9 @@ def generate_output_filename(
     run_folder = storage_path / folder_name
 
     # Create filename with forecast hour
-    filename = f"{date_part}_{hour_part}_{forecast_hour:03d}_{model_name}_{preset_name}.grib"
+    filename = (
+        f"{date_part}_{hour_part}_{forecast_hour:03d}_{model_name}_{preset_name}.grib"
+    )
 
     return run_folder / filename
 
@@ -279,14 +290,18 @@ def create_backup_file(original_path: Path) -> Path:
     # Find next available backup number
     backup_num = 0
     while backup_num < settings.backup.max_count:
-        backup_path = Path(f"{original_path}.{backup_num:02d}{settings.backup.extension}")
+        backup_path = Path(
+            f"{original_path}.{backup_num:02d}{settings.backup.extension}"
+        )
         if not backup_path.exists():
             break
         backup_num += 1
     else:
         # If all backup slots full, overwrite the last one
         final_backup_num = settings.backup.max_count - 1
-        backup_path = Path(f"{original_path}.{final_backup_num:02d}{settings.backup.extension}")
+        backup_path = Path(
+            f"{original_path}.{final_backup_num:02d}{settings.backup.extension}"
+        )
 
     # Create backup by renaming original
     original_path.rename(backup_path)
@@ -409,9 +424,13 @@ def fetch(
         )
 
     # Display configuration summary
-    console.print(f"\n[bold]Configuration:[/bold]")
-    console.print(f"  Model: [green]{settings.defaults.model_name}[/green] (auto-selected)")
-    console.print(f"  Product: [green]{settings.defaults.product_name}[/green] (auto-selected)")
+    console.print("\n[bold]Configuration:[/bold]")
+    console.print(
+        f"  Model: [green]{settings.defaults.model_name}[/green] (auto-selected)"
+    )
+    console.print(
+        f"  Product: [green]{settings.defaults.product_name}[/green] (auto-selected)"
+    )
     console.print(f"  Preset: [green]{preset}[/green]")
     console.print(
         f"  Location: [green]{location.center_lat}, {location.center_lon}[/green] "
@@ -449,9 +468,7 @@ def fetch(
     )
 
     # Generate output path in run-specific folder
-    latest_forecast = nqb.get_latest_run_start(
-        dt.datetime.now(tz=dt.timezone.utc), qs
-    )
+    latest_forecast = nqb.get_latest_run_start(dt.datetime.now(tz=dt.timezone.utc), qs)
     output_path = generate_output_filename(
         model_name=settings.defaults.model_name,
         product_name=settings.defaults.product_name,
@@ -461,37 +478,43 @@ def fetch(
         storage_path=storage_path,
     )
 
-    console.print(f"\n[bold]Target file:[/bold]")
+    console.print("\n[bold]Target file:[/bold]")
     console.print(f"  Path: [cyan]{output_path}[/cyan]")
-    console.print(f"  Forecast time: [cyan]{latest_forecast.strftime('%Y-%m-%d %H:00 UTC')}[/cyan]")
+    console.print(
+        f"  Forecast time: [cyan]{latest_forecast.strftime('%Y-%m-%d %H:00 UTC')}[/cyan]"
+    )
 
     # Check if file already exists locally
     file_exists = output_path.exists()
     if file_exists:
         file_size = output_path.stat().st_size
-        console.print(f"  Status: [yellow]File already exists ({file_size:,} bytes)[/yellow]")
+        console.print(
+            f"  Status: [yellow]File already exists ({file_size:,} bytes)[/yellow]"
+        )
     else:
-        console.print(f"  Status: [dim]File does not exist locally[/dim]")
+        console.print("  Status: [dim]File does not exist locally[/dim]")
 
     # Handle check-only mode (no download, just report)
     if check_only:
-        console.print(f"\n[bold]Check-only mode:[/bold] No download will be performed")
+        console.print("\n[bold]Check-only mode:[/bold] No download will be performed")
         if file_exists:
-            console.print(f"[green]✓[/green] Latest forecast file exists locally")
+            console.print("[green]✓[/green] Latest forecast file exists locally")
         else:
-            console.print(f"[yellow]![/yellow] Latest forecast file not found locally")
+            console.print("[yellow]![/yellow] Latest forecast file not found locally")
         raise typer.Exit(code=0)
 
     # Handle existing file (bandwidth optimization)
     if file_exists and not force:
         if new_only:
             # --new-only flag: skip if file exists (for automated scripts)
-            console.print(f"\n[yellow]File exists and --new-only specified. Skipping download.[/yellow]")
+            console.print(
+                "\n[yellow]File exists and --new-only specified. Skipping download.[/yellow]"
+            )
             console.print(f"  Using existing file: [cyan]{output_path}[/cyan]")
             raise typer.Exit(code=0)
         else:
             # Interactive mode: ask user what to do
-            console.print(f"\n[bold yellow]File already exists![/bold yellow]")
+            console.print("\n[bold yellow]File already exists![/bold yellow]")
             choice = Prompt.ask(
                 "What would you like to do?",
                 choices=["download", "skip", "cancel"],
@@ -507,10 +530,10 @@ def fetch(
 
     # Create backup before overwriting (data integrity protection)
     if file_exists:
-        console.print(f"\n[bold]Backing up existing file...[/bold]")
+        console.print("\n[bold]Backing up existing file...[/bold]")
         create_backup_file(output_path)
 
-    console.print(f"\n[bold]Fetching data...[/bold]")
+    console.print("\n[bold]Fetching data...[/bold]")
 
     # Fetch data
     result = ngf.fetch_with_timeout(

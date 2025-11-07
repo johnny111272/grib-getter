@@ -10,7 +10,6 @@ Key features:
 - Comprehensive attempt tracking for debugging
 """
 
-import datetime as dt
 import time
 from collections.abc import Iterator
 from datetime import datetime, timezone
@@ -20,7 +19,6 @@ import httpx
 from loguru import logger
 from pydantic import BaseModel
 
-import noaa_query_builder as nqb
 from config import settings
 
 # =============================================================================
