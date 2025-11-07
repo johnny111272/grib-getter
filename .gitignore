@@ -17,3 +17,6 @@ user.toml
 
 # Downloaded GRIB data
 grib_data/
+
+# MkDocs build output
+site/
