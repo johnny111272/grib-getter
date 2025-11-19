@@ -341,8 +341,8 @@ def collect_query_arguments(qs: QueryStructure) -> tuple[str, str, str]:
     Returns tuple of: (variables_string, levels_string, subregion_string)
     All encoded for URL inclusion.
     """
-    variables = get_url_encoded_keys(**qs.variables.model_dump())
-    levels = get_url_encoded_keys(**qs.levels.model_dump())
+    variables = get_url_encoded_keys(**qs.variables.model_dump())  # pyright: ignore[reportAny]
+    levels = get_url_encoded_keys(**qs.levels.model_dump())  # pyright: ignore[reportAny]
     subregion = "=".join(["subregion", urlencode(query=qs.bounding_box.model_dump())])
 
     return variables, levels, subregion
@@ -362,11 +362,11 @@ def build_query_url(qt: QueryTime, qa: tuple[str, str, str], qs: QueryStructure)
         (
             (
                 "dir",
-                qs.query_model.dir.format(**qt.model_dump()),
+                qs.query_model.dir.format(**qt.model_dump()),  # pyright: ignore[reportAny]
             ),
             (
                 "file",
-                qs.query_model.file.format(**qt.model_dump()),
+                qs.query_model.file.format(**qt.model_dump()),  # pyright: ignore[reportAny]
             ),
         )
     )

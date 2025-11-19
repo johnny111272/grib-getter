@@ -14,7 +14,7 @@ import typer
 from loguru import logger
 from rich.console import Console
 from rich.logging import RichHandler
-from rich.prompt import Prompt, Confirm
+from rich.prompt import Confirm, Prompt
 from typing_extensions import Annotated
 
 import noaa_grib_fetcher as ngf
